@@ -7,13 +7,6 @@ const files = ["v1.ts", "v2.ts", "v1.client.ts", "v2.client.ts"];
 const filenames: string[] = [];
 const contents: string[] = [];
 
-const formatValue = (value: unknown) => {
-  if (typeof value === "string") return `"${value}"`;
-  if (typeof value === "object") return JSON.stringify(value);
-
-  return value;
-};
-
 const printLibraryV1 = (initializer?: string, memberTwo?: boolean) => {
   let content = "";
 
