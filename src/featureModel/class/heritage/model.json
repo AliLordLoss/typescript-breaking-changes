@@ -1,0 +1,86 @@
+{
+  "name": "heritageClauses",
+  "parentRelation": "optional",
+  "childrenRelation": "or",
+  "x": 533,
+  "y": 123,
+  "children": [
+    {
+      "name": "extendsHeritageClause",
+      "parentRelation": "optional",
+      "x": 384,
+      "y": 233,
+      "children": [
+        {
+          "name": "token",
+          "parentRelation": "mandatory",
+          "x": 322,
+          "y": 305,
+          "children": [
+            {
+              "name": "ExtendsKeyword",
+              "x": 320,
+              "y": 384
+            }
+          ]
+        },
+
+        {
+          "name": "type",
+          "parentRelation": "mandatory",
+          "x": 482,
+          "y": 367,
+          "children": [
+            {
+              "name": "Expression",
+              "x": 487,
+              "y": 457
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "implementsHeritageClause",
+      "parentRelation": "optional",
+      "x": 684,
+      "y": 233,
+      "children": [
+        {
+          "name": "token",
+          "parentRelation": "mandatory",
+          "x": 622,
+          "y": 305,
+          "children": [
+            {
+              "name": "ImplementsKeyword",
+              "x": 620,
+              "y": 407
+            }
+          ]
+        },
+        {
+          "name": "types",
+          "parentRelation": "mandatory",
+          "x": 775,
+          "y": 301,
+          "children": [
+            {
+              "name": "type*",
+              "parentRelation": "mandatory",
+              "x": 782,
+              "y": 367,
+              "children": [
+                {
+                  "name": "Expression",
+                  "x": 787,
+                  "y": 457
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
