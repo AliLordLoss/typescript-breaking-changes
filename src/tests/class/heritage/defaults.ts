@@ -15,42 +15,34 @@ export const baseClassStateKeys = Object.keys(
 /*
  *  Inheritance
  */
+const resolveImplementationBody = (item: string, isDeclare: boolean) =>
+  item
+    .replace("%impl%", isDeclare ? "" : "{};")
+    .replace("%implstringreturn%", isDeclare ? "" : "{ return ''; };");
+
+const resolveSuperCall = (item: string, isImplements: boolean) =>
+  item.replace("%supercall%", isImplements ? "" : "super();");
+
 const BASE_CLASS = `class Base {
   %privateproperty%
 
   %constructor%
 
-  public method() %impl%;
-  
+  public method() %impl%
+
   %privatemethod%
 }
 `;
 
 const BASE_CLASS_FEATURES = {
-  Constructor: "constructor() %impl%;",
-  PrivateMethod: "private someMethod() %impl%;",
+  Constructor: "constructor() %impl%",
+  PrivateMethod: "private someMethod(): string %implstringreturn%",
   PrivateProperty: "private someProperty: string;",
 };
 
 const BASE_CLASS_FEATURE_KEYS = Object.keys(
   BASE_CLASS_FEATURES,
 ) as (keyof typeof BASE_CLASS_FEATURES)[];
-
-const DERIVED_CLASS = `export class Derived %heritage% Base {
-  %constructor%
-
-  %override%;
-}
-`;
-
-const DERIVED_CLASS_FEATURES = {
-  Constructor: "constructor() { super() };",
-  Override: "override method() { console.log('overridden!'); };",
-};
-
-const DERIVED_CLASS_FEATURE_KEYS = Object.keys(
-  DERIVED_CLASS_FEATURES,
-) as (keyof typeof DERIVED_CLASS_FEATURES)[];
 
 type BaseClassOptions = {
   withConstructor: boolean;
@@ -62,16 +54,6 @@ const baseClassOptionsAllFalse: BaseClassOptions = {
   withConstructor: false,
   withPrivateMethod: false,
   withPrivateProperty: false,
-};
-
-type DerivedClassOptions = {
-  withConstructor: boolean;
-  withOverride: boolean;
-};
-
-const derivedClassOptionsAllFalse: DerivedClassOptions = {
-  withConstructor: false,
-  withOverride: false,
 };
 
 export function* generateBaseClassOptions(): Generator<{
@@ -101,6 +83,32 @@ export function* generateBaseClassOptions(): Generator<{
   }
 }
 
+const DERIVED_CLASS = `export class Derived %heritage% Base {
+  %constructor%
+
+  %override%;
+}
+`;
+
+const DERIVED_CLASS_FEATURES = {
+  Constructor: "constructor() { %supercall% };",
+  Override: "method() { console.log('overridden!'); };",
+};
+
+const DERIVED_CLASS_FEATURE_KEYS = Object.keys(
+  DERIVED_CLASS_FEATURES,
+) as (keyof typeof DERIVED_CLASS_FEATURES)[];
+
+const derivedClassOptionsAllFalse: DerivedClassOptions = {
+  withConstructor: false,
+  withOverride: false,
+};
+
+type DerivedClassOptions = {
+  withConstructor: boolean;
+  withOverride: boolean;
+};
+
 export function* generateDerivedClassOptions(): Generator<{
   options: DerivedClassOptions;
   name: string;
@@ -127,9 +135,6 @@ export function* generateDerivedClassOptions(): Generator<{
   }
 }
 
-const resolveImplementationBody = (item: string, isDeclare: boolean) =>
-  item.replace("%impl%", isDeclare ? "" : "{}");
-
 export function genBaseClass(options: BaseClassOptions, isDeclare: boolean) {
   return BASE_CLASS_FEATURE_KEYS.reduce(
     (acc, item) => {
@@ -155,7 +160,12 @@ export function genDerivedClass(
     (acc, item) =>
       acc.replace(
         `%${item.toLowerCase()}%`,
-        options[`with${item}`] ? DERIVED_CLASS_FEATURES[item] : "",
+        options[`with${item}`]
+          ? resolveSuperCall(
+              DERIVED_CLASS_FEATURES[item],
+              heritage === "implements",
+            )
+          : "",
       ),
     DERIVED_CLASS.replace("%heritage%", heritage),
   );
@@ -166,15 +176,19 @@ const CLIENT_CLASS = `class Client %heritage% Derived {
 
   %override%
 
-  %modifier% someMethod(): number { return 0 };
+  %modifier% %somemethod%
 
-  %modifier% someProperty: number;
+  %modifier% %someproperty%
 }
 `;
 
 const CLIENT_CLASS_FEATURES = {
-  Constructor: "constructor() { super() };",
-  Override: "override method() { console.log('overridden in client!'); };",
+  Constructor: "constructor() { %supercall% };",
+  Override: "method() { console.log('overridden in client!'); };",
+  SameMethod: "someMethod(): string { return ''; };",
+  DifferentMethod: "someMethod(): number { return 0; };",
+  SameProperty: "someProperty: string;",
+  DifferentProperty: "someProperty: number;",
 };
 
 export function* genClient(): Generator<{ client: string; id: number }> {
@@ -194,21 +208,42 @@ export function* genClient(): Generator<{ client: string; id: number }> {
       result = result.replaceAll("%modifier%", modifier);
       for (const constructor of [true, false]) {
         for (const override of [true, false]) {
-          yield {
-            client: result
-              .replace(
-                "%constructor%",
-                constructor ? CLIENT_CLASS_FEATURES.Constructor : "",
-              )
-              .replace(
-                "%override%",
-                override && heritage === "extends"
-                  ? CLIENT_CLASS_FEATURES.Override
-                  : "",
-              ),
-            id: clientId,
-          };
-          clientId++;
+          for (const sameMethod of [true, false]) {
+            for (const sameProperty of [true, false]) {
+              yield {
+                client: result
+                  .replace(
+                    "%constructor%",
+                    constructor
+                      ? resolveSuperCall(
+                          CLIENT_CLASS_FEATURES.Constructor,
+                          heritage === "implements",
+                        )
+                      : "",
+                  )
+                  .replace(
+                    "%override%",
+                    override && heritage === "extends"
+                      ? CLIENT_CLASS_FEATURES.Override
+                      : "",
+                  )
+                  .replace(
+                    "%somemethod%",
+                    sameMethod
+                      ? CLIENT_CLASS_FEATURES.SameMethod
+                      : CLIENT_CLASS_FEATURES.DifferentMethod,
+                  )
+                  .replace(
+                    "%someproperty%",
+                    sameProperty
+                      ? CLIENT_CLASS_FEATURES.SameProperty
+                      : CLIENT_CLASS_FEATURES.DifferentProperty,
+                  ),
+                id: clientId,
+              };
+              clientId++;
+            }
+          }
         }
       }
     }

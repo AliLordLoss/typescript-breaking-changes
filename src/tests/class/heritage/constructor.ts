@@ -105,6 +105,16 @@ const printChangeBaseClass = () => {
           const name = `changeBaseClass_${baseName}To_${nextBaseName}${heritage}_${derivedName}`;
           const derivedClass = genDerivedClass(heritage, derivedOptions);
 
+          // not having override in derived, or private method and/or property in base
+          // will break v1 when heritage type is implements!
+          if (
+            heritage === "implements" &&
+            (!derivedOptions.withOverride ||
+              baseOptions.withPrivateMethod ||
+              baseOptions.withPrivateProperty)
+          )
+            continue;
+
           const v1Content = `${genBaseClass(
             baseOptions,
             false, // hardcoded since it's not a declare!
