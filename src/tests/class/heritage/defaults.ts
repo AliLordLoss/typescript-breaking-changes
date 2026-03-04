@@ -37,7 +37,7 @@ const BASE_CLASS = `class Base {
 const BASE_CLASS_FEATURES = {
   Constructor: "constructor() %impl%",
   PrivateMethod: "private someMethod(): string %implstringreturn%",
-  PrivateProperty: "private someProperty: string;",
+  PrivateProperty: "private someProperty: string = 'hello';",
 };
 
 const BASE_CLASS_FEATURE_KEYS = Object.keys(
@@ -187,8 +187,8 @@ const CLIENT_CLASS_FEATURES = {
   Override: "method() { console.log('overridden in client!'); };",
   SameMethod: "someMethod(): string { return ''; };",
   DifferentMethod: "someMethod(): number { return 0; };",
-  SameProperty: "someProperty: string;",
-  DifferentProperty: "someProperty: number;",
+  SameProperty: "someProperty: string = 'hi';",
+  DifferentProperty: "someProperty: number = 32;",
 };
 
 export function* genClient(): Generator<{ client: string; id: number }> {
