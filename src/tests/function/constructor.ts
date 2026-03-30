@@ -1,4 +1,5 @@
 import fs from "fs";
+import path from "path";
 import {
   functionStateKeys,
   functionStates,
@@ -11,7 +12,7 @@ import {
 } from "./defaults";
 
 let testCount = 0;
-const context = "src/tests/function/raw";
+const context = path.join(__dirname, "raw");
 const files = ["v1.ts", "v2.ts", "v1.client.ts", "v2.client.ts"];
 const filenames: string[] = [];
 const contents: string[] = [];
@@ -95,11 +96,11 @@ const printTest = (
 //  - Do it for all 5 states to include params too
 // 4. Parameter name change - all 4 states with param, type and no type
 
-const printAddFunction = () => {
+const printAddFunction = async () => {
   for (const fnStateKey of functionStateKeys) {
     const name = `addFunction_${fnStateKey}`;
     const v1Content = "";
-    const v2Content = functionStates[fnStateKey] + genFn("none");
+    const v2Content = functionStates[fnStateKey] + (await genFn());
     const [v1Client, v2Client] = printClient(name);
 
     printTest(name, v1Content, v2Content, v1Client, v2Client);
@@ -107,103 +108,103 @@ const printAddFunction = () => {
   }
 };
 
-const printRemoveFunction = () => {
-  for (const fnStateKey of functionStateKeys) {
-    const name = `removeFunction_${fnStateKey}`;
-    const v1Content = functionStates[fnStateKey] + genFn("none");
-    const v2Content = "";
-    const [v1Client, v2Client] = printClient(
-      name,
-      [["a", []]],
-      isDefaultState(fnStateKey),
-    );
+// const printRemoveFunction = () => {
+//   for (const fnStateKey of functionStateKeys) {
+//     const name = `removeFunction_${fnStateKey}`;
+//     const v1Content = functionStates[fnStateKey] + genFn("none");
+//     const v2Content = "";
+//     const [v1Client, v2Client] = printClient(
+//       name,
+//       [["a", []]],
+//       isDefaultState(fnStateKey),
+//     );
 
-    printTest(name, v1Content, v2Content, v1Client, v2Client);
-    testCount++;
-  }
-};
+//     printTest(name, v1Content, v2Content, v1Client, v2Client);
+//     testCount++;
+//   }
+// };
 
-const printChangeFunctionModifier = () => {
-  for (const fnStateKey of functionStateKeys) {
-    for (const secondaryFnStateKey of functionStateKeys) {
-      if (secondaryFnStateKey === fnStateKey) continue;
+// const printChangeFunctionModifier = () => {
+//   for (const fnStateKey of functionStateKeys) {
+//     for (const secondaryFnStateKey of functionStateKeys) {
+//       if (secondaryFnStateKey === fnStateKey) continue;
 
-      const name = `changeFunctionModifier_${fnStateKey}_to_${secondaryFnStateKey}`;
-      const v1Content = functionStates[fnStateKey] + genFn("none");
-      const v2Content = functionStates[secondaryFnStateKey] + genFn("none");
-      const [v1Client, v2Client] = printClient(
-        name,
-        [["a", []]],
-        isDefaultState(fnStateKey),
-      );
+//       const name = `changeFunctionModifier_${fnStateKey}_to_${secondaryFnStateKey}`;
+//       const v1Content = functionStates[fnStateKey] + genFn("none");
+//       const v2Content = functionStates[secondaryFnStateKey] + genFn("none");
+//       const [v1Client, v2Client] = printClient(
+//         name,
+//         [["a", []]],
+//         isDefaultState(fnStateKey),
+//       );
 
-      printTest(name, v1Content, v2Content, v1Client, v2Client);
-      testCount++;
-    }
-  }
-};
+//       printTest(name, v1Content, v2Content, v1Client, v2Client);
+//       testCount++;
+//     }
+//   }
+// };
 
-const printChangeParameter = () => {
-  // For all function states
-  for (const fnStateKey of functionStateKeys) {
-    // For all parameter states
-    for (const param of paramStates) {
-      // For with and without a declared type
-      for (const secondaryParam of paramStates) {
-        if (param === secondaryParam) continue;
-        const name = `changeParameter_${fnStateKey}_${param}_to${secondaryParam}`;
+// const printChangeParameter = () => {
+//   // For all function states
+//   for (const fnStateKey of functionStateKeys) {
+//     // For all parameter states
+//     for (const param of paramStates) {
+//       // For with and without a declared type
+//       for (const secondaryParam of paramStates) {
+//         if (param === secondaryParam) continue;
+//         const name = `changeParameter_${fnStateKey}_${param}_to${secondaryParam}`;
 
-        const v1Content = functionStates[fnStateKey] + genFn(param, "a", "x");
-        const v2Content =
-          functionStates[fnStateKey] + genFn(secondaryParam, "a", "x");
+//         const v1Content = functionStates[fnStateKey] + genFn(param, "a", "x");
+//         const v2Content =
+//           functionStates[fnStateKey] + genFn(secondaryParam, "a", "x");
 
-        const fnSignatures: FnSignature[] = [];
-        if (isUsedWithoutParam(param)) fnSignatures.push(["a", []]);
-        if (isUsedWithParam(param)) fnSignatures.push(["a", ["1"]]);
-        if (isUsedWithMoreParams(param)) fnSignatures.push(["a", ["1", "2"]]);
+//         const fnSignatures: FnSignature[] = [];
+//         if (isUsedWithoutParam(param)) fnSignatures.push(["a", []]);
+//         if (isUsedWithParam(param)) fnSignatures.push(["a", ["1"]]);
+//         if (isUsedWithMoreParams(param)) fnSignatures.push(["a", ["1", "2"]]);
 
-        const [v1Client, v2Client] = printClient(
-          name,
-          fnSignatures,
-          isDefaultState(fnStateKey),
-        );
-        printTest(name, v1Content, v2Content, v1Client, v2Client);
-        testCount++;
-      }
-    }
-  }
-};
+//         const [v1Client, v2Client] = printClient(
+//           name,
+//           fnSignatures,
+//           isDefaultState(fnStateKey),
+//         );
+//         printTest(name, v1Content, v2Content, v1Client, v2Client);
+//         testCount++;
+//       }
+//     }
+//   }
+// };
 
-const printChangeParameterName = () => {
-  // For all function states
-  for (const fnStateKey of functionStateKeys) {
-    // For all parameter states
-    for (const param of paramStates) {
-      // For with and without a declared type
-      const name = `changeParameterName_${fnStateKey}_${param}`;
-      const v1Content = functionStates[fnStateKey] + genFn(param, "a", "x");
-      const v2Content = functionStates[fnStateKey] + genFn(param, "a", "y");
-      const fnSignatures: FnSignature[] = [];
-      if (isUsedWithoutParam(param)) fnSignatures.push(["a", []]);
-      if (isUsedWithParam(param)) fnSignatures.push(["a", ["1"]]);
-      if (isUsedWithMoreParams(param)) fnSignatures.push(["a", ["1", "2"]]);
-      const [v1Client, v2Client] = printClient(
-        name,
-        fnSignatures,
-        isDefaultState(fnStateKey),
-      );
-      printTest(name, v1Content, v2Content, v1Client, v2Client);
-      testCount++;
-    }
-  }
-};
+// const printChangeParameterName = () => {
+//   // For all function states
+//   for (const fnStateKey of functionStateKeys) {
+//     // For all parameter states
+//     for (const param of paramStates) {
+//       // For with and without a declared type
+//       const name = `changeParameterName_${fnStateKey}_${param}`;
+//       const v1Content = functionStates[fnStateKey] + genFn(param, "a", "x");
+//       const v2Content = functionStates[fnStateKey] + genFn(param, "a", "y");
+//       const fnSignatures: FnSignature[] = [];
+//       if (isUsedWithoutParam(param)) fnSignatures.push(["a", []]);
+//       if (isUsedWithParam(param)) fnSignatures.push(["a", ["1"]]);
+//       if (isUsedWithMoreParams(param)) fnSignatures.push(["a", ["1", "2"]]);
+//       const [v1Client, v2Client] = printClient(
+//         name,
+//         fnSignatures,
+//         isDefaultState(fnStateKey),
+//       );
+//       printTest(name, v1Content, v2Content, v1Client, v2Client);
+//       testCount++;
+//     }
+//   }
+// };
 
-const printTests = () => {
-  printAddFunction();
-  printRemoveFunction();
-  printChangeFunctionModifier();
-  printChangeParameter();
-  printChangeParameterName();
+const printTests = async () => {
+  await printAddFunction();
+  // printRemoveFunction();
+  // printChangeFunctionModifier();
+  // printChangeParameter();
+  // printChangeParameterName();
   for (let i = 0; i < filenames.length; i++) {
     fs.writeFile(filenames[i], contents[i], (err) => {
       if (err) console.log(err);
@@ -215,5 +216,11 @@ const printTests = () => {
 if (!fs.existsSync(context)) {
   fs.mkdirSync(context);
 }
-const r = printTests();
-console.log(r);
+
+printTests()
+  .then((r) => {
+    console.log(r);
+  })
+  .catch((e) => {
+    console.error(e);
+  });
