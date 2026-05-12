@@ -124,7 +124,9 @@ const printChangeBaseClass = () => {
             false, // hardcoded since it's not a declare!
           )}\n${derivedClass}`;
 
-          for (const { client, id } of genClient()) {
+          for (const { client, id } of genClient(
+            baseOptions.withPrivateProperty || baseOptions.withPrivateMethod,
+          )) {
             printTest(
               name + id,
               v1Content,

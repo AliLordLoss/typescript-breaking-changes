@@ -191,7 +191,9 @@ const CLIENT_CLASS_FEATURES = {
   DifferentProperty: "someProperty: number = 32;",
 };
 
-export function* genClient(): Generator<{ client: string; id: number }> {
+export function* genClient(
+  baseClassHasPrivate: boolean = false,
+): Generator<{ client: string; id: number }> {
   let clientId = 0;
   // simplest client, instantiate and call method
   yield {
@@ -201,7 +203,10 @@ export function* genClient(): Generator<{ client: string; id: number }> {
   clientId++;
 
   // now generate some heritage usage!
-  for (const heritage of ["extends", "implements"]) {
+  const heritages = baseClassHasPrivate
+    ? ["extends"]
+    : ["extends", "implements"];
+  for (const heritage of heritages) {
     let result = `import { Derived } from "./%importaddr%";\n${CLIENT_CLASS}`;
     result = result.replace("%heritage%", heritage);
     for (const modifier of ["public", "private", "protected"]) {
@@ -210,6 +215,7 @@ export function* genClient(): Generator<{ client: string; id: number }> {
         for (const override of [true, false]) {
           for (const sameMethod of [true, false]) {
             for (const sameProperty of [true, false]) {
+              if (!override && heritage === "implements") continue; // must override if implements
               yield {
                 client: result
                   .replace(
