@@ -39,7 +39,7 @@ for dir in "$BASE_PATH"/*; do
 
   # ---- v1 ----
   if [[ -f "$v1_file" ]]; then
-    (cd "$dir" && npx tsc "$dirname.v1.client.ts" > /dev/null 2>&1)
+    (cd "$dir" && npx tsc --noEmit "$dirname.v1.client.ts" > /dev/null 2>&1)
     v1_status=$?
   else
     v1_status=127
