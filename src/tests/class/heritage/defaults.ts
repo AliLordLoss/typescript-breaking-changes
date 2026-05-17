@@ -191,60 +191,91 @@ const CLIENT_CLASS_FEATURES = {
   DifferentProperty: "someProperty: number = 32;",
 };
 
-export function* genClient(
-  baseClassHasPrivate: boolean = false,
-): Generator<{ client: string; id: number }> {
-  let clientId = 0;
-  // simplest client, instantiate and call method
-  yield {
-    client: `import { Derived } from "./%importaddr%"; const instance = new Derived(); instance.method();`,
-    id: clientId,
-  };
-  clientId++;
+type ClientOptions = {
+  heritage: "extends" | "implements";
+  modifier: "public" | "private" | "protected";
+  constructor: boolean;
+  override: boolean;
+  method: "same" | "different" | "none";
+  property: "same" | "different" | "none";
+};
 
-  // now generate some heritage usage!
-  const heritages = baseClassHasPrivate
-    ? ["extends"]
-    : ["extends", "implements"];
-  for (const heritage of heritages) {
+export function genClient(clientOptions: ClientOptions | null): {
+  client: string;
+} {
+  // simplest client, instantiate and call method
+  if (clientOptions === null) {
+    return {
+      client: `import { Derived } from "./%importaddr%"; const instance = new Derived(); instance.method();`,
+    };
+  } else {
     let result = `import { Derived } from "./%importaddr%";\n${CLIENT_CLASS}`;
-    result = result.replace("%heritage%", heritage);
-    for (const modifier of ["public", "private", "protected"]) {
-      result = result.replaceAll("%modifier%", modifier);
+
+    return {
+      client: result
+        .replace("%heritage%", clientOptions.heritage)
+        .replaceAll("%modifier%", clientOptions.modifier)
+        .replace(
+          "%constructor%",
+          clientOptions.constructor
+            ? resolveSuperCall(
+                CLIENT_CLASS_FEATURES.Constructor,
+                clientOptions.heritage === "implements",
+              )
+            : "",
+        )
+        .replace(
+          "%override%",
+          clientOptions.override && clientOptions.heritage === "extends"
+            ? CLIENT_CLASS_FEATURES.Override
+            : "",
+        )
+        .replace(
+          "%somemethod%",
+          clientOptions.method === "same"
+            ? CLIENT_CLASS_FEATURES.SameMethod
+            : clientOptions.method === "different"
+              ? CLIENT_CLASS_FEATURES.DifferentMethod
+              : "",
+        )
+        .replace(
+          "%someproperty%",
+          clientOptions.property === "same"
+            ? CLIENT_CLASS_FEATURES.SameProperty
+            : clientOptions.property === "different"
+              ? CLIENT_CLASS_FEATURES.DifferentProperty
+              : "",
+        ),
+    };
+  }
+}
+
+export function* genClientOptions(): Generator<{
+  clientOptions: ClientOptions | null;
+  id: number;
+}> {
+  yield { clientOptions: null, id: 0 };
+
+  let clientId = 1;
+  // `as const` makes the array readonly and the types of its elements literal types instead of string
+  // so heritage will be of type "extends" | "implements" instead of string
+  for (const heritage of ["extends", "implements"] as const) {
+    // reason for `as const` same as above
+    for (const modifier of ["public", "private", "protected"] as const) {
       for (const constructor of [true, false]) {
         for (const override of [true, false]) {
-          for (const sameMethod of [true, false]) {
-            for (const sameProperty of [true, false]) {
+          for (const method of ["same", "different", "none"] as const) {
+            for (const property of ["same", "different", "none"] as const) {
               if (!override && heritage === "implements") continue; // must override if implements
               yield {
-                client: result
-                  .replace(
-                    "%constructor%",
-                    constructor
-                      ? resolveSuperCall(
-                          CLIENT_CLASS_FEATURES.Constructor,
-                          heritage === "implements",
-                        )
-                      : "",
-                  )
-                  .replace(
-                    "%override%",
-                    override && heritage === "extends"
-                      ? CLIENT_CLASS_FEATURES.Override
-                      : "",
-                  )
-                  .replace(
-                    "%somemethod%",
-                    sameMethod
-                      ? CLIENT_CLASS_FEATURES.SameMethod
-                      : CLIENT_CLASS_FEATURES.DifferentMethod,
-                  )
-                  .replace(
-                    "%someproperty%",
-                    sameProperty
-                      ? CLIENT_CLASS_FEATURES.SameProperty
-                      : CLIENT_CLASS_FEATURES.DifferentProperty,
-                  ),
+                clientOptions: {
+                  heritage,
+                  modifier,
+                  constructor,
+                  override,
+                  method,
+                  property,
+                },
                 id: clientId,
               };
               clientId++;

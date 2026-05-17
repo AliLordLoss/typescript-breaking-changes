@@ -7,6 +7,7 @@ import {
   baseClassStates,
   genBaseClass,
   genClient,
+  genClientOptions,
   genDerivedClass,
   generateBaseClassOptions,
   generateDerivedClassOptions,
@@ -70,7 +71,8 @@ const printChangeBaseClass = () => {
             nextBaseClassStateKey.toLowerCase().includes("declare"), // check if base class is a declare!
           )}\n${derivedClass}`;
 
-          for (const { client, id } of genClient()) {
+          for (const { clientOptions, id } of genClientOptions()) {
+            const { client } = genClient(clientOptions);
             printTest(
               name + id,
               v1Content,
@@ -124,9 +126,21 @@ const printChangeBaseClass = () => {
             false, // hardcoded since it's not a declare!
           )}\n${derivedClass}`;
 
-          for (const { client, id } of genClient(
-            baseOptions.withPrivateProperty || baseOptions.withPrivateMethod,
-          )) {
+          const baseHasPrivate =
+            baseOptions.withPrivateMethod || baseOptions.withPrivateProperty;
+          for (const { clientOptions, id } of genClientOptions()) {
+            // sanity checks for v1 to compile fine
+            if (
+              clientOptions &&
+              ((baseOptions.withPrivateMethod &&
+                clientOptions.method !== "none") ||
+                (baseOptions.withPrivateProperty &&
+                  clientOptions.property !== "none") ||
+                (baseHasPrivate && clientOptions.heritage === "implements"))
+            ) {
+              continue;
+            }
+            const { client } = genClient(clientOptions);
             printTest(
               name + id,
               v1Content,
