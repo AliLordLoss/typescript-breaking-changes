@@ -1,3 +1,6 @@
+import { exec } from "child_process";
+import { promisify } from "util";
+
 export const functionStates = {
   export: "export ",
   exportAsync: "export async ",
@@ -52,27 +55,45 @@ export const isUsedWithMoreParams = (key: ParamState) => key === "dotdotdot";
 export const isUsedWithoutParam = (key: ParamState) =>
   clientUseWithoutParamStateList.includes(key);
 
-const genParam = (param: ParamState, paramName: string) => {
-  switch (param) {
-    case "noOperator":
-      return `${paramName}:number`;
-    case "dotdotdot":
-      return `...${paramName}:number[]`;
-    case "questionToken":
-      return `${paramName}?:number`;
-    case "initializer":
-      return `${paramName}:number = 1`;
-    case "none":
-      return "";
+const execAsync = promisify(exec);
+
+async function runFandangoParam(): Promise<string> {
+  const { stdout, stderr } = await execAsync(
+    "fandango fuzz -f param.spec -n 1",
+  );
+
+  if (stderr) {
+    throw new Error(`Error executing fandango: ${stderr}`);
+  }
+
+  return stdout.trim();
+}
+
+const genParam = async (): Promise<string> => {
+  // switch (param) {
+  //   case "noOperator":
+  //     return `${paramName}:number`;
+  //   case "dotdotdot":
+  //     return `...${paramName}:number[]`;
+  //   case "questionToken":
+  //     return `${paramName}?:number`;
+  //   case "initializer":
+  //     return `${paramName}:number = 1`;
+  //   case "none":
+  //     return "";
+  // }
+
+  try {
+    const result = await runFandangoParam();
+    return result;
+  } catch (error) {
+    console.error(error);
+    return "";
   }
 };
 
-export const genFn = (
-  param: ParamState,
-  fnName: string = "a",
-  paramName: string = "x",
-) => {
-  const fnParam = genParam(param, paramName);
+export const genFn = async (fnName: string = "a") => {
+  const fnParam = await genParam();
 
   return `function ${fnName}(${fnParam}){  }\n`;
 };
