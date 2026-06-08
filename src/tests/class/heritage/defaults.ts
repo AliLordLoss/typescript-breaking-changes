@@ -50,39 +50,6 @@ type BaseClassOptions = {
   withPrivateProperty: boolean;
 };
 
-const baseClassOptionsAllFalse: BaseClassOptions = {
-  withConstructor: false,
-  withPrivateMethod: false,
-  withPrivateProperty: false,
-};
-
-export function* generateBaseClassOptions(): Generator<{
-  options: BaseClassOptions;
-  name: string;
-}> {
-  const keys: (keyof BaseClassOptions)[] = [
-    "withConstructor",
-    "withPrivateMethod",
-    "withPrivateProperty",
-  ];
-  // 2^n combinations
-  const total = 1 << keys.length;
-
-  for (let i = 0; i < total; i++) {
-    // copy from all false instance
-    const combination: BaseClassOptions = { ...baseClassOptionsAllFalse };
-    let name = "";
-    for (let bit = 0; bit < keys.length; bit++) {
-      combination[keys[bit]] = Boolean((i >> bit) & 1);
-      if (combination[keys[bit]]) name += keys[bit] + "_";
-    }
-    yield {
-      options: combination,
-      name,
-    };
-  }
-}
-
 const DERIVED_CLASS = `export class Derived %heritage% Base {
   %constructor%
 
@@ -98,42 +65,6 @@ const DERIVED_CLASS_FEATURES = {
 const DERIVED_CLASS_FEATURE_KEYS = Object.keys(
   DERIVED_CLASS_FEATURES,
 ) as (keyof typeof DERIVED_CLASS_FEATURES)[];
-
-const derivedClassOptionsAllFalse: DerivedClassOptions = {
-  withConstructor: false,
-  withOverride: false,
-};
-
-type DerivedClassOptions = {
-  withConstructor: boolean;
-  withOverride: boolean;
-};
-
-export function* generateDerivedClassOptions(): Generator<{
-  options: DerivedClassOptions;
-  name: string;
-}> {
-  const keys: (keyof DerivedClassOptions)[] = [
-    "withConstructor",
-    "withOverride",
-  ];
-  // 2^n combinations
-  const total = 1 << keys.length;
-
-  for (let i = 0; i < total; i++) {
-    // copy from all false instance
-    const combination: DerivedClassOptions = { ...derivedClassOptionsAllFalse };
-    let name = "";
-    for (let bit = 0; bit < keys.length; bit++) {
-      combination[keys[bit]] = Boolean((i >> bit) & 1);
-      if (combination[keys[bit]]) name += keys[bit] + "_";
-    }
-    yield {
-      options: combination,
-      name,
-    };
-  }
-}
 
 export function genBaseClass(options: BaseClassOptions, isDeclare: boolean) {
   return BASE_CLASS_FEATURE_KEYS.reduce(
@@ -191,7 +122,7 @@ const CLIENT_CLASS_FEATURES = {
   DifferentProperty: "someProperty: number = 32;",
 };
 
-type ClientOptions = {
+export type ClientOptions = {
   heritage: "extends" | "implements";
   modifier: "public" | "private" | "protected";
   constructor: boolean;
@@ -247,42 +178,5 @@ export function genClient(clientOptions: ClientOptions | null): {
               : "",
         ),
     };
-  }
-}
-
-export function* genClientOptions(): Generator<{
-  clientOptions: ClientOptions | null;
-  id: number;
-}> {
-  yield { clientOptions: null, id: 0 };
-
-  let clientId = 1;
-  // `as const` makes the array readonly and the types of its elements literal types instead of string
-  // so heritage will be of type "extends" | "implements" instead of string
-  for (const heritage of ["extends", "implements"] as const) {
-    // reason for `as const` same as above
-    for (const modifier of ["public", "private", "protected"] as const) {
-      for (const constructor of [true, false]) {
-        for (const override of [true, false]) {
-          for (const method of ["same", "different", "none"] as const) {
-            for (const property of ["same", "different", "none"] as const) {
-              if (!override && heritage === "implements") continue; // must override if implements
-              yield {
-                clientOptions: {
-                  heritage,
-                  modifier,
-                  constructor,
-                  override,
-                  method,
-                  property,
-                },
-                id: clientId,
-              };
-              clientId++;
-            }
-          }
-        }
-      }
-    }
   }
 }

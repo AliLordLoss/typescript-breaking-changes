@@ -5,12 +5,10 @@ import pLimit from "p-limit";
 import {
   baseClassStateKeys,
   baseClassStates,
+  ClientOptions,
   genBaseClass,
   genClient,
-  genClientOptions,
   genDerivedClass,
-  generateBaseClassOptions,
-  generateDerivedClassOptions,
 } from "./defaults";
 
 let testCount = 0;
@@ -40,18 +38,43 @@ const printTest = (
 };
 
 const printChangeBaseClass = () => {
-  // first check all possible modifiers for base class
+  const baseOptionKeys = [
+    "withConstructor",
+    "withPrivateMethod",
+    "withPrivateProperty",
+  ] as const;
+  const baseDefault = {
+    withConstructor: false,
+    withPrivateMethod: false,
+    withPrivateProperty: false,
+  };
+
+  const derivedVariantsByHeritage = {
+    extends: [
+      {
+        options: { withConstructor: false, withOverride: false },
+        name: "Minimal",
+      },
+    ],
+    implements: [
+      {
+        options: { withConstructor: false, withOverride: true },
+        name: "WithOverride",
+      },
+    ],
+  } as const;
+
+  // first: state-based base-class permutations (keep client variants minimal)
   for (const baseClassStateKey of baseClassStateKeys) {
     for (const nextBaseClassStateKey of baseClassStateKeys) {
-      // must be different!
       if (baseClassStateKey === nextBaseClassStateKey) continue;
 
-      for (const {
-        options: derivedOptions,
-        name: derivedName,
-      } of generateDerivedClassOptions()) {
-        for (const heritage of ["extends", "implements"] as const) {
-          const name = `changeBaseClass_${baseClassStateKey}_To_${nextBaseClassStateKey}_${heritage}_${derivedName}`;
+      for (const heritage of ["extends", "implements"] as const) {
+        for (const {
+          options: derivedOptions,
+          name: derivedName,
+        } of derivedVariantsByHeritage[heritage]) {
+          const testName = `changeBaseClass_${baseClassStateKey}_to_${nextBaseClassStateKey}_${heritage}_${derivedName}`;
           const derivedClass = genDerivedClass(heritage, derivedOptions);
 
           const v1Content = `${baseClassStates[baseClassStateKey]}${genBaseClass(
@@ -60,7 +83,7 @@ const printChangeBaseClass = () => {
               withPrivateMethod: false,
               withPrivateProperty: false,
             },
-            baseClassStateKey.toLowerCase().includes("declare"), // check if base class is a declare!
+            baseClassStateKey.toLowerCase().includes("declare"),
           )}\n${derivedClass}`;
           const v2Content = `${baseClassStates[nextBaseClassStateKey]}${genBaseClass(
             {
@@ -68,17 +91,50 @@ const printChangeBaseClass = () => {
               withPrivateMethod: false,
               withPrivateProperty: false,
             },
-            nextBaseClassStateKey.toLowerCase().includes("declare"), // check if base class is a declare!
+            nextBaseClassStateKey.toLowerCase().includes("declare"),
           )}\n${derivedClass}`;
 
-          for (const { clientOptions, id } of genClientOptions()) {
-            const { client } = genClient(clientOptions);
+          const clientVariants: {
+            clientOptions: ClientOptions | null;
+            label: string;
+          }[] = [
+            { clientOptions: null, label: "instantiation" },
+            {
+              clientOptions: {
+                heritage: "extends",
+                modifier: "public",
+                constructor: true,
+                override: true,
+                method: "same",
+                property: "same",
+              },
+              label: "max_ext",
+            },
+            {
+              clientOptions: {
+                heritage: "implements",
+                modifier: "public",
+                constructor: true,
+                override: true,
+                method: "same",
+                property: "same",
+              },
+              label: "max_impl",
+            },
+          ];
+
+          for (const { clientOptions, label } of clientVariants) {
+            const effectiveClientOptions = clientOptions
+              ? { ...clientOptions }
+              : null;
+            const { client } = genClient(effectiveClientOptions);
+            const clientNameBase = `${testName}.${label}`;
             printTest(
-              name + id,
+              clientNameBase,
               v1Content,
               v2Content,
-              client.replace("%importaddr%", `${name}${id}.v1`),
-              client.replace("%importaddr%", `${name}${id}.v2`),
+              client.replace("%importaddr%", `${clientNameBase}.v1`),
+              client.replace("%importaddr%", `${clientNameBase}.v2`),
             );
             testCount++;
           }
@@ -87,66 +143,107 @@ const printChangeBaseClass = () => {
     }
   }
 
-  // now check some properties and methods in Base class
-  for (const {
-    options: baseOptions,
-    name: baseName,
-  } of generateBaseClassOptions()) {
-    for (const {
-      options: nextBaseOptions,
-      name: nextBaseName,
-    } of generateBaseClassOptions()) {
-      // must be different!
-      if (baseName === nextBaseName) continue;
+  // second: single-option changes in Base class (isolate each option)
+  for (const key of baseOptionKeys) {
+    const variants = [
+      {
+        v1Options: { ...baseDefault, [key]: true },
+        v2Options: baseDefault,
+        direction: "Removed",
+      },
+      {
+        v1Options: baseDefault,
+        v2Options: { ...baseDefault, [key]: true },
+        direction: "Added",
+      },
+    ];
 
-      for (const {
-        options: derivedOptions,
-        name: derivedName,
-      } of generateDerivedClassOptions()) {
-        for (const heritage of ["extends", "implements"] as const) {
-          const name = `changeBaseClass_${baseName}To_${nextBaseName}${heritage}_${derivedName}`;
+    for (const { v1Options, v2Options, direction } of variants) {
+      for (const heritage of ["extends", "implements"] as const) {
+        for (const {
+          options: derivedOptions,
+          name: derivedName,
+        } of derivedVariantsByHeritage[heritage]) {
+          const keyName = key.replace("with", "");
+          const testName = `changeBaseClass_${keyName}_${direction}_${heritage}_${derivedName}`;
           const derivedClass = genDerivedClass(heritage, derivedOptions);
 
-          // not having override in derived, or private method and/or property in base
-          // will break v1 when heritage type is implements!
+          // skip invalid combos
           if (
             heritage === "implements" &&
             (!derivedOptions.withOverride ||
-              baseOptions.withPrivateMethod ||
-              baseOptions.withPrivateProperty)
+              v1Options.withPrivateMethod ||
+              v1Options.withPrivateProperty)
           )
             continue;
 
-          const v1Content = `${genBaseClass(
-            baseOptions,
-            false, // hardcoded since it's not a declare!
-          )}\n${derivedClass}`;
-          const v2Content = `${genBaseClass(
-            nextBaseOptions,
-            false, // hardcoded since it's not a declare!
-          )}\n${derivedClass}`;
+          const v1Content = `${genBaseClass(v1Options, false)}\n${derivedClass}`;
+          const v2Content = `${genBaseClass(v2Options, false)}\n${derivedClass}`;
 
           const baseHasPrivate =
-            baseOptions.withPrivateMethod || baseOptions.withPrivateProperty;
-          for (const { clientOptions, id } of genClientOptions()) {
-            // sanity checks for v1 to compile fine
-            if (
-              clientOptions &&
-              ((baseOptions.withPrivateMethod &&
-                clientOptions.method !== "none") ||
-                (baseOptions.withPrivateProperty &&
-                  clientOptions.property !== "none") ||
-                (baseHasPrivate && clientOptions.heritage === "implements"))
-            ) {
-              continue;
+            v1Options.withPrivateMethod || v1Options.withPrivateProperty;
+
+          const clientVariants: {
+            clientOptions: ClientOptions | null;
+            label: string;
+          }[] = [
+            { clientOptions: null, label: "instantiation" },
+            {
+              clientOptions: {
+                heritage: "extends",
+                modifier: "public",
+                constructor: true,
+                override: true,
+                method: "same",
+                property: "same",
+              },
+              label: "max_ext",
+            },
+            {
+              clientOptions: {
+                heritage: "implements",
+                modifier: "public",
+                constructor: true,
+                override: true,
+                method: "same",
+                property: "same",
+              },
+              label: "max_impl",
+            },
+          ];
+
+          for (const { clientOptions, label } of clientVariants) {
+            const effectiveClientOptions = clientOptions
+              ? { ...clientOptions }
+              : null;
+
+            // adjust maximal client to ensure it compiles under v1
+            if (effectiveClientOptions) {
+              if (
+                v1Options.withPrivateMethod &&
+                effectiveClientOptions.method === "same"
+              )
+                effectiveClientOptions.method = "different";
+              if (
+                v1Options.withPrivateProperty &&
+                effectiveClientOptions.property === "same"
+              )
+                effectiveClientOptions.property = "different";
+              if (
+                baseHasPrivate &&
+                effectiveClientOptions.heritage === "implements"
+              )
+                continue;
             }
-            const { client } = genClient(clientOptions);
+
+            const { client } = genClient(effectiveClientOptions);
+            const clientNameBase = `${testName}.${label}`;
             printTest(
-              name + id,
+              clientNameBase,
               v1Content,
               v2Content,
-              client.replace("%importaddr%", `${name}${id}.v1`),
-              client.replace("%importaddr%", `${name}${id}.v2`),
+              client.replace("%importaddr%", `${clientNameBase}.v1`),
+              client.replace("%importaddr%", `${clientNameBase}.v2`),
             );
             testCount++;
           }
@@ -156,34 +253,8 @@ const printChangeBaseClass = () => {
   }
 };
 
-// const printAddInheritance = () => {
-//   for (const baseKey of baseClassKeys) {
-//     for (const derivedKey of derivedClassKeys) {
-//       const name = `addInheritance_${baseKey}_With_${derivedKey}`;
-//       const v1Content = `${genBaseClass(baseKey)}\nclass Derived {}`;
-//       const v2Content = `${genBaseClass(baseKey)}\n${genDerivedClass(derivedKey)}`;
-//       printTest(name, v1Content, v2Content);
-//       testCount++;
-//     }
-//   }
-// };
-
-// const printRemoveInheritance = () => {
-//   for (const baseKey of baseClassKeys) {
-//     for (const derivedKey of derivedClassKeys) {
-//       const name = `removeInheritance_${baseKey}_With_${derivedKey}`;
-//       const v1Content = `${genBaseClass(baseKey)}\n${genDerivedClass(derivedKey)}`;
-//       const v2Content = `${genBaseClass(baseKey)}\nclass Derived {}`;
-//       printTest(name, v1Content, v2Content);
-//       testCount++;
-//     }
-//   }
-// };
-
 const printTests = async () => {
   printChangeBaseClass();
-  // printAddInheritance();
-  // printRemoveInheritance();
 
   const limit = pLimit(50);
 
