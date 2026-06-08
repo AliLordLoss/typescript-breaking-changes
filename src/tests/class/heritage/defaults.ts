@@ -155,12 +155,7 @@ export function genClient(clientOptions: ClientOptions | null): {
               )
             : "",
         )
-        .replace(
-          "%override%",
-          clientOptions.override && clientOptions.heritage === "extends"
-            ? CLIENT_CLASS_FEATURES.Override
-            : "",
-        )
+        .replace("%override%", CLIENT_CLASS_FEATURES.Override)
         .replace(
           "%somemethod%",
           clientOptions.method === "same"
