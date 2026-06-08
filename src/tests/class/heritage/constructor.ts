@@ -220,20 +220,21 @@ const printChangeBaseClass = () => {
             // adjust maximal client to ensure it compiles under v1
             if (effectiveClientOptions) {
               if (
-                v1Options.withPrivateMethod &&
-                effectiveClientOptions.method === "same"
-              )
-                effectiveClientOptions.method = "different";
-              if (
-                v1Options.withPrivateProperty &&
-                effectiveClientOptions.property === "same"
-              )
-                effectiveClientOptions.property = "different";
-              if (
                 baseHasPrivate &&
                 effectiveClientOptions.heritage === "implements"
               )
                 continue;
+
+              if (
+                v1Options.withPrivateMethod &&
+                effectiveClientOptions.method === "same"
+              )
+                effectiveClientOptions.method = "none";
+              if (
+                v1Options.withPrivateProperty &&
+                effectiveClientOptions.property === "same"
+              )
+                effectiveClientOptions.property = "none";
             }
 
             const { client } = genClient(effectiveClientOptions);
