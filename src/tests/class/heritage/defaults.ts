@@ -34,6 +34,10 @@ const BASE_CLASS = `class Base {
 }
 `;
 
+const BASE_CLASS_WITHOUT_METHOD = `export class Base {
+  %privatemethod%
+}`;
+
 const BASE_CLASS_FEATURES = {
   Constructor: "constructor() %impl%",
   PrivateMethod: "private someMethod(): string %implstringreturn%",
@@ -53,7 +57,7 @@ type BaseClassOptions = {
 const DERIVED_CLASS = `export class Derived %heritage% Base {
   %constructor%
 
-  %override%;
+  %override%
 }
 `;
 
@@ -77,6 +81,15 @@ export function genBaseClass(options: BaseClassOptions, isDeclare: boolean) {
       );
     },
     resolveImplementationBody(BASE_CLASS, isDeclare),
+  );
+}
+
+export function genBaseClassWithoutMethod(withPrivateMethod: boolean) {
+  return BASE_CLASS_WITHOUT_METHOD.replace(
+    "%privatemethod%",
+    withPrivateMethod
+      ? resolveImplementationBody(BASE_CLASS_FEATURES.PrivateMethod, false)
+      : "",
   );
 }
 
@@ -131,13 +144,16 @@ export type ClientOptions = {
   property: "same" | "different" | "none";
 };
 
-export function genClient(clientOptions: ClientOptions | null): {
+export function genClient(
+  clientOptions: ClientOptions | null,
+  addBaseClassAsType: boolean,
+): {
   client: string;
 } {
   // simplest client, instantiate and call method
   if (clientOptions === null) {
     return {
-      client: `import { Derived } from "./%importaddr%"; const instance = new Derived(); instance.method();`,
+      client: `import { Derived${addBaseClassAsType ? ", Base" : ""} } from "./%importaddr%"; const instance${addBaseClassAsType ? ": Base" : ""} = new Derived();${addBaseClassAsType ? "" : " instance.method();"}`,
     };
   } else {
     let result = `import { Derived } from "./%importaddr%";\n${CLIENT_CLASS}`;
@@ -155,7 +171,10 @@ export function genClient(clientOptions: ClientOptions | null): {
               )
             : "",
         )
-        .replace("%override%", CLIENT_CLASS_FEATURES.Override)
+        .replace(
+          "%override%",
+          clientOptions.override ? CLIENT_CLASS_FEATURES.Override : "",
+        )
         .replace(
           "%somemethod%",
           clientOptions.method === "same"

@@ -9,6 +9,7 @@ import {
   genBaseClass,
   genClient,
   genDerivedClass,
+  genBaseClassWithoutMethod,
 } from "./defaults";
 
 let testCount = 0;
@@ -127,7 +128,7 @@ const printChangeBaseClass = () => {
             const effectiveClientOptions = clientOptions
               ? { ...clientOptions }
               : null;
-            const { client } = genClient(effectiveClientOptions);
+            const { client } = genClient(effectiveClientOptions, false);
             const clientNameBase = `${testName}.${label}`;
             printTest(
               clientNameBase,
@@ -237,7 +238,7 @@ const printChangeBaseClass = () => {
                 effectiveClientOptions.property = "none";
             }
 
-            const { client } = genClient(effectiveClientOptions);
+            const { client } = genClient(effectiveClientOptions, false);
             const clientNameBase = `${testName}.${label}`;
             printTest(
               clientNameBase,
@@ -254,8 +255,128 @@ const printChangeBaseClass = () => {
   }
 };
 
+const printChangeInheritance = () => {
+  const directions = ["Added", "Removed"] as const;
+  const heritages = ["extends", "implements"] as const;
+
+  for (const direction of directions) {
+    for (const heritage of heritages) {
+      const baseVariants = [{ withPrivateMethod: false, name: "Empty" }];
+
+      // TypeScript does not allow implementing a class with private members unless you extend it,
+      // so we only test private members for 'extends'.
+      if (heritage === "extends") {
+        baseVariants.push({
+          withPrivateMethod: true,
+          name: "WithPrivate",
+        });
+      }
+
+      for (const baseVariant of baseVariants) {
+        const testName = `changeInheritance_${direction}_${heritage}_${baseVariant.name}`;
+        const baseContent = genBaseClassWithoutMethod(
+          baseVariant.withPrivateMethod,
+        );
+
+        // Generate the with/without strings
+        const derivedWith = genDerivedClass(heritage, {
+          withConstructor: false,
+          withOverride: true, // so the instantiating client don't break
+        });
+        // Cleanly strip the inheritance keyword to generate the 'without' variant
+        const derivedWithout = derivedWith.replace(` ${heritage} Base`, "");
+
+        const v1Derived = direction === "Added" ? derivedWithout : derivedWith;
+        const v2Derived = direction === "Added" ? derivedWith : derivedWithout;
+
+        const v1Content = `${baseContent}\n${v1Derived}`;
+        const v2Content = `${baseContent}\n${v2Derived}`;
+
+        const clientVariants: {
+          clientOptions: ClientOptions | null;
+          label: string;
+        }[] = [
+          { clientOptions: null, label: "instantiation" },
+          {
+            clientOptions: {
+              heritage: "extends",
+              modifier: "public",
+              constructor: false,
+              override: false,
+              method: "none",
+              property: "none",
+            },
+            label: "extends",
+          },
+          {
+            clientOptions: {
+              heritage: "implements",
+              modifier: "public",
+              constructor: false,
+              override: false,
+              method: "none",
+              property: "none",
+            },
+            label: "implements",
+          },
+          // A client that happens to declare a private method with the same name
+          {
+            clientOptions: {
+              heritage: "extends",
+              modifier: "private",
+              constructor: false,
+              override: false,
+              method: "same",
+              property: "none",
+            },
+            label: "extends_conflict",
+          },
+        ];
+
+        for (const { clientOptions, label } of clientVariants) {
+          if (clientOptions) {
+            const baseHasPrivate = baseVariant.name === "WithPrivate";
+            const isV1Inheriting = direction === "Removed";
+
+            // Guard: V1 must compile for it to be a valid test.
+            // A client cannot "implement" a class that has private members.
+            if (
+              clientOptions.heritage === "implements" &&
+              baseHasPrivate &&
+              isV1Inheriting
+            ) {
+              continue;
+            }
+
+            // Guard: If V1 already inherits the private method, the client cannot declare a conflicting private method in V1.
+            if (
+              clientOptions.method === "same" &&
+              baseHasPrivate &&
+              isV1Inheriting
+            ) {
+              continue;
+            }
+          }
+
+          const { client } = genClient(clientOptions, true);
+          const clientNameBase = `${testName}.${label}`;
+          printTest(
+            clientNameBase,
+            v1Content,
+            v2Content,
+            client.replace("%importaddr%", `${clientNameBase}.v1`),
+            client.replace("%importaddr%", `${clientNameBase}.v2`),
+          );
+          testCount++;
+        }
+      }
+    }
+  }
+};
+
 const printTests = async () => {
   printChangeBaseClass();
+  printChangeInheritance();
 
   const limit = pLimit(50);
 
