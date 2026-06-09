@@ -281,7 +281,7 @@ const printChangeInheritance = () => {
         // Generate the with/without strings
         const derivedWith = genDerivedClass(heritage, {
           withConstructor: false,
-          withOverride: true, // so the instantiating client don't break
+          withOverride: false,
         });
         // Cleanly strip the inheritance keyword to generate the 'without' variant
         const derivedWithout = derivedWith.replace(` ${heritage} Base`, "");
