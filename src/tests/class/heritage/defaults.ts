@@ -120,19 +120,19 @@ const CLIENT_CLASS = `class Client %heritage% Derived {
 
   %override%
 
-  %modifier% %somemethod%
+  %somemethod%
 
-  %modifier% %someproperty%
+  %someproperty%
 }
 `;
 
 const CLIENT_CLASS_FEATURES = {
   Constructor: "constructor() { %supercall% };",
   Override: "method() { console.log('overridden in client!'); };",
-  SameMethod: "someMethod(): string { return ''; };",
-  DifferentMethod: "someMethod(): number { return 0; };",
-  SameProperty: "someProperty: string = 'hi';",
-  DifferentProperty: "someProperty: number = 32;",
+  SameMethod: "private someMethod(): string { return ''; };",
+  DifferentMethod: "public someMethod(): number { return 0; };",
+  SameProperty: "private someProperty: string = 'hi';",
+  DifferentProperty: "public someProperty: number = 32;",
 };
 
 export type ClientOptions = {
@@ -161,7 +161,6 @@ export function genClient(
     return {
       client: result
         .replace("%heritage%", clientOptions.heritage)
-        .replaceAll("%modifier%", clientOptions.modifier)
         .replace(
           "%constructor%",
           clientOptions.constructor
