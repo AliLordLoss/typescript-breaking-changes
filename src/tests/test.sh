@@ -54,7 +54,7 @@ for dir in "$BASE_PATH"/*; do
 
   # ---- v2 ----
   if [[ -f "$v2_file" ]]; then
-    (cd "$dir" && npx tsc "$dirname.v2.client.ts" > /dev/null 2>&1)
+    (cd "$dir" && npx tsc --noEmit "$dirname.v2.client.ts" > /dev/null 2>&1)
     v2_status=$?
   else
     v2_status=127
