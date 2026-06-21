@@ -1,5 +1,6 @@
 import { exec } from "child_process";
 import { promisify } from "util";
+import { generateClientArguments } from "./generators";
 
 export const functionStates = {
   export: "export ",
@@ -20,46 +21,11 @@ const defaultFunctionStateKeys: (keyof typeof functionStates)[] = [
 export const isDefaultState = (key: string) =>
   defaultFunctionStateKeys.includes(key as keyof typeof functionStates);
 
-type ParamState =
-  | "none"
-  | "noOperator"
-  | "dotdotdot"
-  | "questionToken"
-  | "initializer";
-
-export const paramStates: ParamState[] = [
-  "none",
-  "noOperator",
-  "dotdotdot",
-  "questionToken",
-  "initializer",
-];
-
-const clientUseWithParamStateList: ParamState[] = [
-  "noOperator",
-  "dotdotdot",
-  "questionToken",
-  "initializer",
-];
-
-const clientUseWithoutParamStateList: ParamState[] = [
-  "none",
-  "dotdotdot",
-  "questionToken",
-  "initializer",
-];
-
-export const isUsedWithParam = (key: ParamState) =>
-  clientUseWithParamStateList.includes(key);
-export const isUsedWithMoreParams = (key: ParamState) => key === "dotdotdot";
-export const isUsedWithoutParam = (key: ParamState) =>
-  clientUseWithoutParamStateList.includes(key);
-
 const execAsync = promisify(exec);
 
-async function runFandangoParam(): Promise<string> {
+export async function runFandangoParam(seed: number): Promise<string> {
   const { stdout, stderr } = await execAsync(
-    "fandango fuzz -f param.spec -n 1",
+    `fandango fuzz -f param.spec -n 1 --random-seed ${seed}`,
   );
 
   if (stderr) {
@@ -69,22 +35,9 @@ async function runFandangoParam(): Promise<string> {
   return stdout.trim();
 }
 
-const genParam = async (): Promise<string> => {
-  // switch (param) {
-  //   case "noOperator":
-  //     return `${paramName}:number`;
-  //   case "dotdotdot":
-  //     return `...${paramName}:number[]`;
-  //   case "questionToken":
-  //     return `${paramName}?:number`;
-  //   case "initializer":
-  //     return `${paramName}:number = 1`;
-  //   case "none":
-  //     return "";
-  // }
-
+export const genParam = async (seed: number): Promise<string> => {
   try {
-    const result = await runFandangoParam();
+    const result = await runFandangoParam(seed);
     return result;
   } catch (error) {
     console.error(error);
@@ -92,8 +45,14 @@ const genParam = async (): Promise<string> => {
   }
 };
 
-export const genFn = async (fnName: string = "a") => {
-  const fnParam = await genParam();
+export const genFn = async (fnName: string, seed: number) => {
+  const fnParam = await genParam(seed); // e.g., "a: string | number, ...b: boolean[]"
+  const mockArgs = generateClientArguments(fnParam); // returns ["'mock_string'", "...[true]"]
 
-  return `function ${fnName}(${fnParam}){  }\n`;
+  return {
+    declaration: `function ${fnName}(${fnParam}){  }\n`,
+    clientCallArgs: mockArgs,
+    name: fnName,
+    params: fnParam,
+  };
 };
