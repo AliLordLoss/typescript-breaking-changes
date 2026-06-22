@@ -235,6 +235,17 @@ function generateMockValue(typeNode: ts.TypeNode): string {
   // Classes/Type References (e.g., Error, Date)
   if (ts.isTypeReferenceNode(typeNode)) {
     const name = typeNode.typeName.getText();
+
+    // Check if it's the generic Array<T> syntax
+    if (
+      name === "Array" &&
+      typeNode.typeArguments &&
+      typeNode.typeArguments.length > 0
+    ) {
+      const innerType = typeNode.typeArguments[0];
+      return `[${generateMockValue(innerType)}]`;
+    }
+
     if (name === "Error") return "new Error('mock error')";
     if (name === "Date") return "new Date()";
   }
