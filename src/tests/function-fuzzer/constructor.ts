@@ -7,12 +7,14 @@ import {
   genParam,
   isDefaultState,
   runFandangoParam,
+  runFandangoTypeAlgebra,
 } from "./defaults";
 import {
   generateClientArguments,
   generateV2ParamMutations,
+  isValidV2Type,
   renameFunctionParameters,
-} from "./generators";
+} from "./ts-utilities";
 
 const MASTER_SEED = 42;
 
@@ -99,8 +101,10 @@ type TestCase = {
 // 1. Adding a function
 // 2. Removing a function
 // 3. Changing a fn state - e.g., export -> export async
-// 3. Changing a parameter - type change, optionality change, rest parameter change, etc.
-// 4. Parameter name change
+// 4. Add more parameters
+// 5. Changing a parameter - type change, optionality change, rest parameter change, etc.
+// 6. Changing a parameter - type change, using fuzzer to generate changes on a base type via type utilities
+// 7. Parameter name change
 
 const printAddFunction: () => Promise<TestCase[]> = async () => {
   const tests = [];
@@ -201,10 +205,18 @@ const printChangeParameter: () => Promise<TestCase[]> = async () => {
       let offset = 1;
       let baseFn = await genFn("fn", MASTER_SEED + i);
       // reroll until we get a function with at least 1 parameter to mutate
-      while (baseFn.params === "") {
+      while (baseFn.params === "" && offset < 20) {
         baseFn = await genFn("fn", MASTER_SEED + i + offset * 1000);
         offset++;
       }
+      // skip if rerolling didn't work after 20 attempts
+      if (baseFn.params === "") {
+        console.warn(
+          `Skipping parameter type change test for ${fnStateKey} with seed ${MASTER_SEED + i} due to no parameters.`,
+        );
+        continue;
+      }
+
       const v2ParamsArr = generateV2ParamMutations(baseFn.params);
       v2ParamsArr.forEach((v2Params, index) => {
         const name = `changeParameter_${fnStateKey}_${i}_variant${index}`;
@@ -244,6 +256,80 @@ const printChangeParameter: () => Promise<TestCase[]> = async () => {
   return tests;
 };
 
+const printChangeParameterTypeFuzz: () => Promise<TestCase[]> = async () => {
+  const tests: TestCase[] = [];
+
+  const BaseParamDefinition = `
+interface BaseParam {
+  id: string;
+  name?: string;
+  metadata: { createdAt: Date; active: boolean; };
+}
+
+`;
+
+  for (let i = 0; i < 10; i++) {
+    for (const fnStateKey of functionStateKeys) {
+      // 1. Fandango generates the complex V2 wrapper (e.g., "Required<Pick<...>>")
+      let fuzzedWrapper = await runFandangoTypeAlgebra(MASTER_SEED + i);
+
+      let offset = 1;
+      while (
+        !isValidV2Type(fuzzedWrapper, BaseParamDefinition) &&
+        offset < 20
+      ) {
+        // reroll until we get a valid type algebra
+        fuzzedWrapper = await runFandangoTypeAlgebra(
+          MASTER_SEED + i + offset * 1000,
+        );
+        offset++;
+      }
+      // skip if rerolling didn't work after 20 attempts
+      if (!isValidV2Type(fuzzedWrapper, BaseParamDefinition)) {
+        console.warn(
+          `Skipping parameter type change (fuzzed) test for ${fnStateKey} with seed ${MASTER_SEED + i} due to invalid type algebra.`,
+        );
+        continue;
+      }
+
+      const name = `changeParameterFuzzed_${fnStateKey}_${i}`;
+
+      // 2. V1 uses the raw BaseEntity
+      const v1File =
+        BaseParamDefinition +
+        functionStates[fnStateKey] +
+        `function fn(param: BaseParam) {}`;
+
+      // 3. V2 uses the Fuzzed Wrapper
+      const v2File =
+        BaseParamDefinition +
+        functionStates[fnStateKey] +
+        `function fn(param: ${fuzzedWrapper}) {}`;
+
+      // 4. The Client ALWAYS uses a mock that perfectly satisfies V1
+      const isDefault = isDefaultState(fnStateKey);
+      const minimalMock = `{ id: "mock", metadata: { createdAt: new Date(), active: true } }`;
+      const maximalMock = `{ id: "mock", name: "mock_name", metadata: { createdAt: new Date(), active: true } }`;
+      const clientCode = `
+      import ${isDefault ? "fn" : "{ fn }"} from "./${name}.%version%";
+
+      fn(${minimalMock});
+      fn(${maximalMock});
+    `;
+
+      tests.push({
+        name: name,
+        v1Content: v1File,
+        v2Content: v2File,
+        v1Client: clientCode.replace("%version%", "v1"),
+        v2Client: clientCode.replace("%version%", "v2"),
+      });
+    }
+  }
+
+  return tests;
+};
+
 const printChangeParameterName: () => Promise<TestCase[]> = async () => {
   const tests = [];
 
@@ -252,10 +338,18 @@ const printChangeParameterName: () => Promise<TestCase[]> = async () => {
       let offset = 1;
       let baseFn = await genFn("fn", MASTER_SEED + i);
       // reroll until we get a function with at least 1 parameter to mutate
-      while (baseFn.params === "") {
+      while (baseFn.params === "" && offset < 20) {
         baseFn = await genFn("fn", MASTER_SEED + i + offset * 1000);
         offset++;
       }
+      // skip if rerolling didn't work after 20 attempts
+      if (baseFn.params === "") {
+        console.warn(
+          `Skipping parameter name change test for ${fnStateKey} with seed ${MASTER_SEED + i} due to no parameters.`,
+        );
+        continue;
+      }
+
       const name = `changeParameterName_${fnStateKey}_${i}`;
       const v1Content = functionStates[fnStateKey] + baseFn.declaration;
       const v2Content =
@@ -277,12 +371,13 @@ const printChangeParameterName: () => Promise<TestCase[]> = async () => {
 
 const printTests = async () => {
   const tests = await Promise.all([
-    printAddFunction(),
-    printRemoveFunction(),
-    printChangeFunctionModifier(),
-    printAddParameter(),
-    printChangeParameter(),
-    printChangeParameterName(),
+    // printAddFunction(),
+    // printRemoveFunction(),
+    // printChangeFunctionModifier(),
+    // printAddParameter(),
+    // printChangeParameter(),
+    printChangeParameterTypeFuzz(),
+    // printChangeParameterName(),
   ]).then((results) => results.flat());
 
   tests.forEach((test) => {
@@ -316,8 +411,9 @@ async function main() {
       });
   } catch (e) {
     console.error(
-      `fandango not available. Please run this script in an environment with fandango installed.
-Use \`pip install fandango-fuzzer\` to install it in a Python environment.`,
+      `Error executing fandango. Is fandango available? Please run this script in an environment with it installed.
+Use \`pip install fandango-fuzzer\` to install it in a Python environment.
+Error: ${e}`,
     );
   }
 }

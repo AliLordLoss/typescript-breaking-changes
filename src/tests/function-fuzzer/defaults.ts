@@ -1,6 +1,6 @@
 import { exec } from "child_process";
 import { promisify } from "util";
-import { generateClientArguments } from "./generators";
+import { generateClientArguments } from "./ts-utilities";
 
 export const functionStates = {
   export: "export ",
@@ -18,14 +18,14 @@ const defaultFunctionStateKeys: (keyof typeof functionStates)[] = [
   "exportDefaultAsync",
 ];
 
-export const isDefaultState = (key: string) =>
-  defaultFunctionStateKeys.includes(key as keyof typeof functionStates);
+export const isDefaultState = (key: keyof typeof functionStates) =>
+  defaultFunctionStateKeys.includes(key);
 
 const execAsync = promisify(exec);
 
-export async function runFandangoParam(seed: number): Promise<string> {
+export async function runFandango(spec: string, seed: number): Promise<string> {
   const { stdout, stderr } = await execAsync(
-    `fandango fuzz -f param.spec -n 1 --random-seed ${seed}`,
+    `fandango fuzz -f ${spec} -n 1 --random-seed ${seed}`,
   );
 
   if (stderr) {
@@ -33,6 +33,14 @@ export async function runFandangoParam(seed: number): Promise<string> {
   }
 
   return stdout.trim();
+}
+
+export async function runFandangoParam(seed: number): Promise<string> {
+  return await runFandango("param.spec", seed);
+}
+
+export async function runFandangoTypeAlgebra(seed: number): Promise<string> {
+  return await runFandango("type-algebra.spec", seed);
 }
 
 export const genParam = async (seed: number): Promise<string> => {
