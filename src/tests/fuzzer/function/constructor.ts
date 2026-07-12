@@ -6,15 +6,14 @@ import {
   genFn,
   genParam,
   isDefaultState,
-  runFandangoParam,
-  runFandangoTypeAlgebra,
+  TestCase,
 } from "./defaults";
 import {
   generateClientArguments,
   generateV2ParamMutations,
-  isValidV2Type,
   renameFunctionParameters,
-} from "./ts-utilities";
+} from "../ts-utilities";
+import { isValidV2Type, runFandangoParam, runFandangoTypeAlgebra } from "..";
 
 const MASTER_SEED = 42;
 
@@ -87,14 +86,6 @@ const printTest = (
   fs.writeFile(`${localCtx}/${name}.v2.client.ts`, v2Client, (err) => {
     if (err) console.log(err);
   });
-};
-
-type TestCase = {
-  name: string;
-  v1Content: string;
-  v2Content: string;
-  v1Client: string;
-  v2Client: string;
 };
 
 // Tests
@@ -371,13 +362,13 @@ const printChangeParameterName: () => Promise<TestCase[]> = async () => {
 
 const printTests = async () => {
   const tests = await Promise.all([
-    // printAddFunction(),
-    // printRemoveFunction(),
-    // printChangeFunctionModifier(),
-    // printAddParameter(),
-    // printChangeParameter(),
+    printAddFunction(),
+    printRemoveFunction(),
+    printChangeFunctionModifier(),
+    printAddParameter(),
+    printChangeParameter(),
     printChangeParameterTypeFuzz(),
-    // printChangeParameterName(),
+    printChangeParameterName(),
   ]).then((results) => results.flat());
 
   tests.forEach((test) => {
