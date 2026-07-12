@@ -160,7 +160,15 @@ const printChangeBaseClass = () => {
     ];
 
     for (const { v1Options, v2Options, direction } of variants) {
-      for (const heritage of ["extends", "implements"] as const) {
+      // if private method/property is being present, the Derived class itself won't compile if it implements
+      const heritages =
+        v1Options.withPrivateMethod ||
+        v1Options.withPrivateProperty ||
+        v2Options.withPrivateMethod ||
+        v2Options.withPrivateProperty
+          ? (["extends"] as const)
+          : (["extends", "implements"] as const);
+      for (const heritage of heritages) {
         for (const {
           options: derivedOptions,
           name: derivedName,
