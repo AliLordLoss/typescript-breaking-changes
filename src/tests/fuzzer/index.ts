@@ -2,6 +2,30 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import ts from "typescript";
 
+export const BASE_PARAMS_DEF = `export interface SuperBaseParam {
+  id: string;
+  name?: string;
+  metadata: { createdAt: Date; active: boolean; };
+}
+
+
+export interface BaseParam extends SuperBaseParam {
+}
+
+
+export interface ChildBaseParam extends BaseParam {
+}
+
+`;
+
+export type TestCase = {
+  name: string;
+  v1Content: string;
+  v2Content: string;
+  v1Client: string;
+  v2Client: string;
+};
+
 const execAsync = promisify(exec);
 
 export async function runFandango(spec: string, seed: number): Promise<string> {

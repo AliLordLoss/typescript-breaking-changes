@@ -1,14 +1,6 @@
 import { runFandangoParam } from "..";
 import { generateClientArguments } from "../ts-utilities";
 
-export type TestCase = {
-  name: string;
-  v1Content: string;
-  v2Content: string;
-  v1Client: string;
-  v2Client: string;
-};
-
 export const functionStates = {
   export: "export ",
   exportAsync: "export async ",

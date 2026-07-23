@@ -6,16 +6,23 @@ import {
   genFn,
   genParam,
   isDefaultState,
-  TestCase,
 } from "./defaults";
 import {
   generateClientArguments,
   generateV2ParamMutations,
   renameFunctionParameters,
 } from "../ts-utilities";
-import { isValidV2Type, runFandangoParam, runFandangoTypeAlgebra } from "..";
+import {
+  isValidV2Type,
+  runFandangoParam,
+  runFandangoTypeAlgebra,
+  BASE_PARAMS_DEF,
+} from "..";
+import type { TestCase } from "..";
 
 const MASTER_SEED = 42;
+
+const GENERATION_COUNT = 100;
 
 const context = path.join(__dirname, "raw");
 
@@ -61,31 +68,41 @@ const printClient = (
   return [contents[0], contents[1]];
 };
 
-const printTest = (
-  name: string,
-  v1Content: string,
-  v2Content: string,
-  v1Client: string,
-  v2Client: string,
-) => {
-  const localCtx = `${context}/${name}`;
+const printTest = (testCase: TestCase) => {
+  const localCtx = `${context}/${testCase.name}`;
 
   if (!fs.existsSync(localCtx)) {
     fs.mkdirSync(localCtx);
   }
 
-  fs.writeFile(`${localCtx}/${name}.v1.ts`, v1Content, (err) => {
-    if (err) console.log(err);
-  });
-  fs.writeFile(`${localCtx}/${name}.v2.ts`, v2Content, (err) => {
-    if (err) console.log(err);
-  });
-  fs.writeFile(`${localCtx}/${name}.v1.client.ts`, v1Client, (err) => {
-    if (err) console.log(err);
-  });
-  fs.writeFile(`${localCtx}/${name}.v2.client.ts`, v2Client, (err) => {
-    if (err) console.log(err);
-  });
+  fs.writeFile(
+    `${localCtx}/${testCase.name}.v1.ts`,
+    testCase.v1Content,
+    (err) => {
+      if (err) console.log(err);
+    },
+  );
+  fs.writeFile(
+    `${localCtx}/${testCase.name}.v2.ts`,
+    testCase.v2Content,
+    (err) => {
+      if (err) console.log(err);
+    },
+  );
+  fs.writeFile(
+    `${localCtx}/${testCase.name}.v1.client.ts`,
+    testCase.v1Client,
+    (err) => {
+      if (err) console.log(err);
+    },
+  );
+  fs.writeFile(
+    `${localCtx}/${testCase.name}.v2.client.ts`,
+    testCase.v2Client,
+    (err) => {
+      if (err) console.log(err);
+    },
+  );
 };
 
 // Tests
@@ -97,10 +114,10 @@ const printTest = (
 // 6. Changing a parameter - type change, using fuzzer to generate changes on a base type via type utilities
 // 7. Parameter name change
 
-const printAddFunction: () => Promise<TestCase[]> = async () => {
-  const tests = [];
+const printAddFunction: () => Promise<number> = async () => {
+  let count = 0;
 
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < GENERATION_COUNT; i++) {
     for (const fnStateKey of functionStateKeys) {
       const name = `addFunction_${fnStateKey}_${i}`;
       const v1Content = "";
@@ -109,17 +126,18 @@ const printAddFunction: () => Promise<TestCase[]> = async () => {
         (await genFn("fn", MASTER_SEED + i)).declaration;
       const [v1Client, v2Client] = printClient(name);
 
-      tests.push({ name, v1Content, v2Content, v1Client, v2Client });
+      printTest({ name, v1Content, v2Content, v1Client, v2Client });
+      count++;
     }
   }
 
-  return tests;
+  return count;
 };
 
-const printRemoveFunction: () => Promise<TestCase[]> = async () => {
-  const tests = [];
+const printRemoveFunction: () => Promise<number> = async () => {
+  let count = 0;
 
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < GENERATION_COUNT; i++) {
     for (const fnStateKey of functionStateKeys) {
       const name = `removeFunction_${fnStateKey}_${i}`;
       const fn = await genFn("fn", MASTER_SEED + i);
@@ -131,17 +149,18 @@ const printRemoveFunction: () => Promise<TestCase[]> = async () => {
         isDefaultState(fnStateKey),
       );
 
-      tests.push({ name, v1Content, v2Content, v1Client, v2Client });
+      printTest({ name, v1Content, v2Content, v1Client, v2Client });
+      count++;
     }
   }
 
-  return tests;
+  return count;
 };
 
-const printChangeFunctionModifier: () => Promise<TestCase[]> = async () => {
-  const tests = [];
+const printChangeFunctionModifier: () => Promise<number> = async () => {
+  let count = 0;
 
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < GENERATION_COUNT; i++) {
     for (const fnStateKey of functionStateKeys) {
       for (const secondaryFnStateKey of functionStateKeys) {
         if (secondaryFnStateKey === fnStateKey) continue;
@@ -155,18 +174,19 @@ const printChangeFunctionModifier: () => Promise<TestCase[]> = async () => {
           [[fn.name, fn.clientCallArgs]],
           isDefaultState(fnStateKey),
         );
-        tests.push({ name, v1Content, v2Content, v1Client, v2Client });
+        printTest({ name, v1Content, v2Content, v1Client, v2Client });
+        count++;
       }
     }
   }
 
-  return tests;
+  return count;
 };
 
-const printAddParameter: () => Promise<TestCase[]> = async () => {
-  const tests = [];
+const printAddParameter: () => Promise<number> = async () => {
+  let count = 0;
 
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < GENERATION_COUNT; i++) {
     for (const fnStateKey of functionStateKeys) {
       const baseFn = await genFn("fn", MASTER_SEED + i);
       const paramsToAdd = await genParam(MASTER_SEED + i + 1000);
@@ -181,17 +201,18 @@ const printAddParameter: () => Promise<TestCase[]> = async () => {
         [[baseFn.name, baseFn.clientCallArgs]],
         isDefaultState(fnStateKey),
       );
-      tests.push({ name, v1Content, v2Content, v1Client, v2Client });
+      printTest({ name, v1Content, v2Content, v1Client, v2Client });
+      count++;
     }
   }
 
-  return tests;
+  return count;
 };
 
-const printChangeParameter: () => Promise<TestCase[]> = async () => {
-  const tests: TestCase[] = [];
+const printChangeParameter: () => Promise<number> = async () => {
+  let count = 0;
 
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < GENERATION_COUNT; i++) {
     for (const fnStateKey of functionStateKeys) {
       let offset = 1;
       let baseFn = await genFn("fn", MASTER_SEED + i);
@@ -224,7 +245,8 @@ const printChangeParameter: () => Promise<TestCase[]> = async () => {
           isDefaultState(fnStateKey),
         );
 
-        tests.push({ name, v1Content, v2Content, v1Client, v2Client });
+        printTest({ name, v1Content, v2Content, v1Client, v2Client });
+        count++;
 
         const reverseName = name + "_reverse";
         const [v1ClientReverse, v2ClientReverse] = printClient(
@@ -233,42 +255,31 @@ const printChangeParameter: () => Promise<TestCase[]> = async () => {
           isDefaultState(fnStateKey),
         );
 
-        tests.push({
+        printTest({
           name: reverseName,
           v1Content: v2Content,
           v2Content: v1Content,
           v1Client: v1ClientReverse,
           v2Client: v2ClientReverse,
         });
+        count++;
       });
     }
   }
 
-  return tests;
+  return count;
 };
 
-const printChangeParameterTypeFuzz: () => Promise<TestCase[]> = async () => {
-  const tests: TestCase[] = [];
+const printChangeParameterTypeFuzz: () => Promise<number> = async () => {
+  let count = 0;
 
-  const BaseParamDefinition = `
-interface BaseParam {
-  id: string;
-  name?: string;
-  metadata: { createdAt: Date; active: boolean; };
-}
-
-`;
-
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < GENERATION_COUNT; i++) {
     for (const fnStateKey of functionStateKeys) {
       // 1. Fandango generates the complex V2 wrapper (e.g., "Required<Pick<...>>")
       let fuzzedWrapper = await runFandangoTypeAlgebra(MASTER_SEED + i);
 
       let offset = 1;
-      while (
-        !isValidV2Type(fuzzedWrapper, BaseParamDefinition) &&
-        offset < 20
-      ) {
+      while (!isValidV2Type(fuzzedWrapper, BASE_PARAMS_DEF) && offset < 20) {
         // reroll until we get a valid type algebra
         fuzzedWrapper = await runFandangoTypeAlgebra(
           MASTER_SEED + i + offset * 1000,
@@ -276,7 +287,7 @@ interface BaseParam {
         offset++;
       }
       // skip if rerolling didn't work after 20 attempts
-      if (!isValidV2Type(fuzzedWrapper, BaseParamDefinition)) {
+      if (!isValidV2Type(fuzzedWrapper, BASE_PARAMS_DEF)) {
         console.warn(
           `Skipping parameter type change (fuzzed) test for ${fnStateKey} with seed ${MASTER_SEED + i} due to invalid type algebra.`,
         );
@@ -287,13 +298,13 @@ interface BaseParam {
 
       // 2. V1 uses the raw BaseEntity
       const v1File =
-        BaseParamDefinition +
+        BASE_PARAMS_DEF +
         functionStates[fnStateKey] +
         `function fn(param: BaseParam) {}`;
 
       // 3. V2 uses the Fuzzed Wrapper
       const v2File =
-        BaseParamDefinition +
+        BASE_PARAMS_DEF +
         functionStates[fnStateKey] +
         `function fn(param: ${fuzzedWrapper}) {}`;
 
@@ -308,23 +319,24 @@ interface BaseParam {
       fn(${maximalMock});
     `;
 
-      tests.push({
+      printTest({
         name: name,
         v1Content: v1File,
         v2Content: v2File,
         v1Client: clientCode.replace("%version%", "v1"),
         v2Client: clientCode.replace("%version%", "v2"),
       });
+      count++;
     }
   }
 
-  return tests;
+  return count;
 };
 
-const printChangeParameterName: () => Promise<TestCase[]> = async () => {
-  const tests = [];
+const printChangeParameterName: () => Promise<number> = async () => {
+  let count = 0;
 
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < GENERATION_COUNT; i++) {
     for (const fnStateKey of functionStateKeys) {
       let offset = 1;
       let baseFn = await genFn("fn", MASTER_SEED + i);
@@ -353,15 +365,16 @@ const printChangeParameterName: () => Promise<TestCase[]> = async () => {
         isDefaultState(fnStateKey),
       );
 
-      tests.push({ name, v1Content, v2Content, v1Client, v2Client });
+      printTest({ name, v1Content, v2Content, v1Client, v2Client });
+      count++;
     }
   }
 
-  return tests;
+  return count;
 };
 
 const printTests = async () => {
-  const tests = await Promise.all([
+  const testCount = await Promise.all([
     printAddFunction(),
     printRemoveFunction(),
     printChangeFunctionModifier(),
@@ -369,19 +382,19 @@ const printTests = async () => {
     printChangeParameter(),
     printChangeParameterTypeFuzz(),
     printChangeParameterName(),
-  ]).then((results) => results.flat());
+  ]).then((results) => results.reduce((acc, item) => acc + item, 0));
 
-  tests.forEach((test) => {
-    printTest(
-      test.name,
-      test.v1Content,
-      test.v2Content,
-      test.v1Client,
-      test.v2Client,
-    );
-  });
+  // tests.forEach((test) => {
+  //   printTest(
+  //     test.name,
+  //     test.v1Content,
+  //     test.v2Content,
+  //     test.v1Client,
+  //     test.v2Client,
+  //   );
+  // });
 
-  return { testCount: tests.length };
+  return { testCount };
 };
 
 async function main() {

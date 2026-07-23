@@ -16,7 +16,7 @@ include('fandango.spec')
 <pick> ::= 'Pick<' <base_target> ', ' <valid_keys> '>'
 
 <valid_keys> ::= '"id"' | '"name"' | '"metadata"' | '"id" | "name"'
-<base_target> ::= 'BaseParam'
+<base_target> ::= 'BaseParam' | 'SuperBaseParam' | 'ChildBaseParam'
 <fuzzed_extension> ::= <object_type> | <class_type> | <intersection_type>
 
 <conditional_target> ::= 'any' | 'unknown' | 'BaseParam' | '{ id: string }' | 'Record<string, any>'
