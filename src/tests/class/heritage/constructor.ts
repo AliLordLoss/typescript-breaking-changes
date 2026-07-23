@@ -366,7 +366,7 @@ const printChangeInheritance = () => {
             }
           }
 
-          const { client } = genClient(clientOptions, true);
+          const { client } = genClient(clientOptions, direction !== "Added");
           const clientNameBase = `${testName}.${label}`;
           printTest(
             clientNameBase,
