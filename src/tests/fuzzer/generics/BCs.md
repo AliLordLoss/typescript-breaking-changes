@@ -1,0 +1,10 @@
+addConstraintToClassGeneric     100/100
+addNewGenericParameter          100/100
+addConstraintToGeneric          97/100
+changeKeyofGeneric              70/100
+changeGenericConstraint         42/100
+changeConstraintClassGeneric    42/100
+removeGenericFromClass          1/1
+changeGenericToBaseParameter    1/1
+addGenericToClass               1/1
+changeKeyofGeneric_Simple       1/1
